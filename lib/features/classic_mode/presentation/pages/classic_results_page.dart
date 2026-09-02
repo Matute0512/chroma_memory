@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/constants/app_palette.dart';
 import '../viewmodels/classic_viewmodel.dart';
 
 /// Pantalla de fin de partida del Modo Clásico.
@@ -29,11 +30,19 @@ class ClassicResultsPage extends StatelessWidget {
                   Icon(
                     Icons.emoji_events,
                     size: 72,
-                    color: state.isNewBest ? scheme.tertiary : scheme.outline,
+                    color: state.completed
+                        ? AppPalette.mint
+                        : (state.isNewBest
+                            ? AppPalette.gold
+                            : scheme.outline),
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    state.isNewBest ? '¡Nuevo récord!' : 'Fin de la partida',
+                    state.completed
+                        ? '¡Reto completado!'
+                        : (state.isNewBest
+                            ? '¡Nuevo récord!'
+                            : 'Fin de la partida'),
                     style: textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -48,7 +57,9 @@ class ClassicResultsPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    'Llegaste a la ronda ${state.round}',
+                    state.completed
+                        ? 'Completaste el reto de hoy.'
+                        : 'Llegaste a la ronda ${state.round}',
                     style: textTheme.bodyMedium?.copyWith(
                       color: scheme.onSurfaceVariant,
                     ),

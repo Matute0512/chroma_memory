@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 
-import '../features/classic_mode/presentation/pages/classic_game_page.dart';
+import '../core/di/injection_container.dart';
+import '../features/classic_mode/presentation/pages/sequence_mode_page.dart';
 import 'pages/home_page.dart';
 import 'pages/settings_page.dart';
 
 /// Rutas con nombre de la aplicación.
 ///
-/// Se usa una tabla estática de rutas porque hoy no hacen falta argumentos
-/// complejos entre pantallas. Si la app crece (por ej. pasar el modo o el
-/// nivel por ruta), conviene migrar a un router paramétrico.
+/// Los modos de secuencias comparten [SequenceModePage] y difieren en título,
+/// descripción y provider (reglas + persistencia de cada modo).
 abstract final class AppRoutes {
   /// Menú principal.
   static const String home = '/';
@@ -16,12 +16,32 @@ abstract final class AppRoutes {
   /// Modo Clásico.
   static const String classic = '/classic';
 
+  /// Desafío Diario.
+  static const String daily = '/daily';
+
+  /// Modo Zen.
+  static const String zen = '/zen';
+
   /// Ajustes (accesibilidad).
   static const String settings = '/settings';
 
   static final Map<String, WidgetBuilder> table = <String, WidgetBuilder>{
     home: (_) => const HomePage(),
-    classic: (_) => const ClassicGamePage(),
+    classic: (_) => SequenceModePage(
+          title: 'Modo Clásico',
+          subtitle: 'Cada ronda suma un color más. Un error y terminás.',
+          provider: classicViewModelProvider,
+        ),
+    daily: (_) => SequenceModePage(
+          title: 'Desafío Diario',
+          subtitle: 'El mismo reto para todos, cada 24 horas. Completalo hoy.',
+          provider: dailyViewModelProvider,
+        ),
+    zen: (_) => SequenceModePage(
+          title: 'Modo Zen',
+          subtitle: 'Sin límites ni penalizaciones: aprendé a tu ritmo.',
+          provider: zenViewModelProvider,
+        ),
     settings: (_) => const SettingsPage(),
   };
 }

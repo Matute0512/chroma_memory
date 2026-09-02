@@ -42,17 +42,23 @@ void main() {
     expect(find.text('Tu récord: 0'), findsOneWidget);
   });
 
-  testWidgets('un modo no disponible avisa que viene próximamente',
+  testWidgets('Desafío Diario y Modo Zen abren sus pantallas',
       (WidgetTester tester) async {
     await pumpApp(tester);
 
+    // Desafío Diario.
     await tester.tap(find.text('Desafío Diario'));
-    await tester.pump();
+    await tester.pumpAndSettle();
+    expect(find.text('Desafío Diario'), findsWidgets); // AppBar + encabezado
+    expect(find.text('Comenzar'), findsOneWidget);
 
-    expect(find.textContaining('próximamente'), findsWidgets);
-
-    // Dejar que el SnackBar se cierre solo para no dejar timers pendientes.
-    await tester.pumpAndSettle(const Duration(seconds: 5));
+    // Volver al menú y abrir Zen.
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Modo Zen'));
+    await tester.pumpAndSettle();
+    expect(find.text('Modo Zen'), findsWidgets);
+    expect(find.text('Comenzar'), findsOneWidget);
   });
 
   testWidgets('Comenzar arranca la partida y pasa a la fase de input',

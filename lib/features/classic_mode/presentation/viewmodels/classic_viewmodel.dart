@@ -23,14 +23,40 @@ enum ClassicPhase {
   /// Acaba de completar la ronda correctamente (pausa breve).
   roundCleared,
 
-  /// Falló y terminó la partida.
+  /// Terminó: falló ([completed] false) o completó el reto (true).
   gameOver,
 }
 
 /// Resultado de tocar una ficha, para que la UI decida el feedback.
 enum TapOutcome { none, correct, roundCleared, wrong }
 
-/// Estado inmutable del Modo Clásico.
+/// Configuración de un modo de secuencias (Clásico / Diario / Zen).
+class SequenceRules {
+  const SequenceRules({
+    this.startLength = 2,
+    this.growRounds = true,
+    this.endOnMistake = true,
+    this.fixedSeed,
+    this.reviewOnMistake = false,
+  });
+
+  /// Largo de la secuencia inicial.
+  final int startLength;
+
+  /// Si la secuencia crece una posición por ronda. false = reto único (Diario).
+  final bool growRounds;
+
+  /// Si un error termina la partida. false = Zen (no hay penalización).
+  final bool endOnMistake;
+
+  /// Semilla determinística (Desafío Diario: misma secuencia para todos hoy).
+  final int? fixedSeed;
+
+  /// En Zen: al errar se vuelve a mostrar la secuencia antes de reintentar.
+  final bool reviewOnMistake;
+}
+
+/// Estado inmutable de una partida de secuencias.
 class ClassicState {
   const ClassicState({
     required this.phase,
@@ -40,6 +66,8 @@ class ClassicState {
     required this.score,
     required this.bestScore,
     required this.isNewBest,
+    required this.completed,
+    required this.mistakes,
     this.watchIndex,
   });
 
@@ -51,6 +79,8 @@ class ClassicState {
         score: 0,
         bestScore: bestScore,
         isNewBest: false,
+        completed: false,
+        mistakes: 0,
       );
 
   final ClassicPhase phase;
@@ -61,17 +91,23 @@ class ClassicState {
   /// Cuántos colores correctos reprodujo el jugador en la ronda actual.
   final int userProgress;
 
-  /// Ronda actual (1-based). La longitud de la secuencia es round + 1.
+  /// Ronda actual (1-based). Con crecimiento, el largo es startLength+round-1.
   final int round;
 
-  /// Puntaje de la partida: un punto por color correcto.
+  /// Puntaje: un punto por color correcto.
   final int score;
 
-  /// Mejor puntaje histórico.
+  /// Mejor puntaje histórico de este modo.
   final int bestScore;
 
   /// Si esta partida rompió el récord.
   final bool isNewBest;
+
+  /// Si la partida terminó por completar el reto (Diario) y no por error.
+  final bool completed;
+
+  /// Errores acumulados (Modo Zen, sin penalización).
+  final int mistakes;
 
   /// Índice del color que está destellando durante [ClassicPhase.watching].
   final int? watchIndex;
@@ -86,6 +122,8 @@ class ClassicState {
     int? score,
     int? bestScore,
     bool? isNewBest,
+    bool? completed,
+    int? mistakes,
     int? watchIndex,
   }) {
     return ClassicState(
@@ -96,21 +134,24 @@ class ClassicState {
       score: score ?? this.score,
       bestScore: bestScore ?? this.bestScore,
       isNewBest: isNewBest ?? this.isNewBest,
+      completed: completed ?? this.completed,
+      mistakes: mistakes ?? this.mistakes,
       watchIndex: watchIndex ?? this.watchIndex,
     );
   }
 }
 
-/// Controla la lógica de una partida del Modo Clásico (Simon-like).
+/// Controla la lógica de una partida de secuencias (Clásico, Diario, Zen).
 ///
 /// Flujo: [newGame] → fase watching (destellan los colores) → input (el
-/// jugador reproduce). Cada ronda suma un color a la secuencia. Un error
-/// termina la partida ([ClassicPhase.gameOver]).
+/// jugador reproduce). Las reglas de crecimiento/penalización las define
+/// [SequenceRules].
 class ClassicViewModel extends StateNotifier<ClassicState> {
   ClassicViewModel({
     required IClassicRepository repository,
     required GenerateSequenceUseCase generateSequence,
     required ValidateUserInputUseCase validateInput,
+    this.rules = const SequenceRules(),
   })  : _repository = repository,
         _generateSequence = generateSequence,
         _validateInput = validateInput,
@@ -119,6 +160,7 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
   final IClassicRepository _repository;
   final GenerateSequenceUseCase _generateSequence;
   final ValidateUserInputUseCase _validateInput;
+  final SequenceRules rules;
 
   /// Token para invalidar tareas en vuelo (destellos, pausas) al reiniciar.
   int _token = 0;
@@ -128,12 +170,21 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
   /// Si esta partida superó el mejor puntaje (para mostrarlo al final).
   bool _earnedNewBest = false;
 
+  /// RNG determinístico para el Desafío Diario (misma secuencia todo el día).
+  math.Random? _rng;
+
   /// Velocidad del destello: baja con cada ronda (cada vez más rápido).
   Duration get _stepDelay =>
       Duration(milliseconds: math.max(240, 700 - (state.round - 1) * 40));
 
   static const Duration _gap = Duration(milliseconds: 180);
   static const Duration _roundPause = Duration(milliseconds: 900);
+
+  /// Largo de la secuencia según las reglas del modo.
+  int get _sequenceLength =>
+      rules.growRounds ? rules.startLength + state.round - 1 : rules.startLength;
+
+  math.Random get _random => _rng ?? math.Random();
 
   /// Carga el mejor puntaje guardado (para mostrarlo en la pantalla inicial).
   Future<void> loadBestScore() async {
@@ -148,6 +199,8 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
     _token++;
     _busy = false;
     _earnedNewBest = false;
+    // Diario: misma semilla todo el día; Clásico/Zen: azar por partida.
+    _rng = rules.fixedSeed != null ? math.Random(rules.fixedSeed) : null;
     final int token = _token;
 
     final int best = await _repository.getBestScore();
@@ -172,8 +225,20 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
             UserInputValidation.correct;
 
     if (!isCorrect) {
-      // Termina la partida. El récord se actualiza en vivo apenas se supera,
-      // así que basta con recordar si en algún momento se superó.
+      // Modos con penalización: termina. Zen: suma error y reintenta.
+      if (!rules.endOnMistake) {
+        _token++;
+        final int newMistakes = state.mistakes + 1;
+        final int retryToken = _token;
+        state = state.copyWith(
+          mistakes: newMistakes,
+          userProgress: 0,
+        );
+        if (rules.reviewOnMistake) {
+          await _playRound(retryToken, reuse: sequence);
+        }
+        return TapOutcome.wrong;
+      }
       _token++;
       state = state.copyWith(
         phase: ClassicPhase.gameOver,
@@ -197,7 +262,7 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
       return TapOutcome.correct;
     }
 
-    // Ronda completa: pausa breve y pasa a la siguiente.
+    // Ronda completa.
     _busy = true;
     state = state.copyWith(
       phase: ClassicPhase.roundCleared,
@@ -205,6 +270,12 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
     );
     await Future<void>.delayed(_roundPause);
     if (token != _token) return TapOutcome.roundCleared;
+
+    if (!rules.growRounds) {
+      // Desafío Diario: la secuencia única se completó.
+      state = state.copyWith(phase: ClassicPhase.gameOver, completed: true);
+      return TapOutcome.roundCleared;
+    }
 
     state = state.copyWith(round: state.round + 1, userProgress: 0);
     await _playRound(token);
@@ -219,11 +290,11 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
     state = ClassicState.initial(bestScore: state.bestScore);
   }
 
-  /// Destella la secuencia de la ronda actual y habilita el input.
-  Future<void> _playRound(int token) async {
+  /// Destella la [reuse] (si viene) o una secuencia nueva, y habilita input.
+  Future<void> _playRound(int token, {ClassicSequence? reuse}) async {
     _busy = true;
     final ClassicSequence sequence =
-        _generateSequence(length: state.round + 1);
+        reuse ?? _generateSequence(length: _sequenceLength, random: _random);
     state = state.copyWith(
       phase: ClassicPhase.watching,
       sequence: sequence,

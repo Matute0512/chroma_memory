@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/accessibility/accessibility_controller.dart';
 import '../../../../core/accessibility/color_vision_mode.dart';
 import '../../../../core/constants/app_palette.dart';
-import '../../../../core/di/injection_container.dart';
 import '../../../../core/layout/responsive.dart';
 import '../../../../core/utils/audio_manager.dart';
 import '../../../../core/utils/haptic_feedback.dart';
@@ -30,20 +29,35 @@ final ColorFilter _kNormalFilter =
     ColorFilter.mode(Colors.white, BlendMode.dst);
 final ColorFilter _kDesaturatedFilter = ColorFilter.matrix(_kGrayscaleMatrix);
 
-/// Pantalla del Modo Clásico (Simon-like).
+/// Pantalla de un modo de secuencias (Clásico / Desafío Diario / Zen).
 ///
-/// Orquesta la UI con el [ClassicViewModel] y los micro-feedback premium:
+/// Comparte el motor ([ClassicViewModel] con [SequenceRules]) y los
+/// micro-feedback premium:
 /// - acierto → "eco" de luz en la ficha + háptico light;
 /// - ronda superada → háptico medium;
-/// - error → shake del tablero + desaturación momentánea + háptico heavy.
-class ClassicGamePage extends ConsumerStatefulWidget {
-  const ClassicGamePage({super.key});
+/// - error → shake + desaturación breve + háptico heavy (en Zen se continúa).
+class SequenceModePage extends ConsumerStatefulWidget {
+  const SequenceModePage({
+    super.key,
+    required this.title,
+    required this.subtitle,
+    required this.provider,
+  });
+
+  /// Título del modo (AppBar y encabezado).
+  final String title;
+
+  /// Descripción breve en la pantalla inicial.
+  final String subtitle;
+
+  /// Provider (StateNotifier) del modo concreto (ver core/di).
+  final StateNotifierProvider<ClassicViewModel, ClassicState> provider;
 
   @override
-  ConsumerState<ClassicGamePage> createState() => _ClassicGamePageState();
+  ConsumerState<SequenceModePage> createState() => _SequenceModePageState();
 }
 
-class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
+class _SequenceModePageState extends ConsumerState<SequenceModePage>
     with SingleTickerProviderStateMixin {
   Timer? _pulseTimer;
   Timer? _saturationTimer;
@@ -62,7 +76,7 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
     // Carga el récord para mostrarlo en la pantalla inicial.
     Future<void>.microtask(() {
       if (mounted) {
-        ref.read(classicViewModelProvider.notifier).loadBestScore();
+        ref.read(widget.provider.notifier).loadBestScore();
       }
     });
   }
@@ -76,7 +90,7 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
   }
 
   Future<void> _startGame() async {
-    await ref.read(classicViewModelProvider.notifier).newGame();
+    await ref.read(widget.provider.notifier).newGame();
   }
 
   /// "Eco" de luz sobre la ficha que se acertó.
@@ -100,7 +114,7 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
 
   Future<void> _onColorTap(ColorId id) async {
     final TapOutcome outcome =
-        await ref.read(classicViewModelProvider.notifier).onTile(id);
+        await ref.read(widget.provider.notifier).onTile(id);
     switch (outcome) {
       case TapOutcome.correct:
         _echoCorrect(id);
@@ -120,7 +134,7 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
   }
 
   Future<void> _openResults() async {
-    final ClassicState finalState = ref.read(classicViewModelProvider);
+    final ClassicState finalState = ref.read(widget.provider);
     final bool? retry = await Navigator.of(context).push<bool>(
       MaterialPageRoute<bool>(
         builder: (_) => ClassicResultsPage(state: finalState),
@@ -136,29 +150,32 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
 
   /// Salta al menú deteniendo la partida (si estaba a mitad de ronda).
   void _leaveToMenu() {
-    ref.read(classicViewModelProvider.notifier).resetToReady();
+    ref.read(widget.provider.notifier).resetToReady();
     Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
-    final ClassicState state = ref.watch(classicViewModelProvider);
+    final ClassicState state = ref.watch(widget.provider);
     final ColorVisionMode vision = ref.watch(accessibilityProvider);
 
     // Cuando termina la partida, ir a resultados (una sola vez por estado).
-    ref.listen<ClassicState>(classicViewModelProvider, (ClassicState? prev, ClassicState next) {
-      if (next.phase == ClassicPhase.gameOver &&
-          prev?.phase != ClassicPhase.gameOver) {
-        _openResults();
-      }
-    });
+    ref.listen<ClassicState>(
+      widget.provider,
+      (ClassicState? prev, ClassicState next) {
+        if (next.phase == ClassicPhase.gameOver &&
+            prev?.phase != ClassicPhase.gameOver) {
+          _openResults();
+        }
+      },
+    );
 
-    // Tono del color en cada destello de la fase "ver" (sincronizado con la luz).
+    // Tono del color en cada destello de la fase "ver" (sincronizado con luz).
     ref.listen<int?>(
-      classicViewModelProvider.select((ClassicState s) => s.watchIndex),
+      widget.provider.select((ClassicState s) => s.watchIndex),
       (int? prev, int? next) {
         if (next == null) return;
-        final ClassicState current = ref.read(classicViewModelProvider);
+        final ClassicState current = ref.read(widget.provider);
         if (next < current.sequence.length) {
           final ColorId c = current.sequence.colors[next];
           unawaited(AudioManager.instance.play('${c.name}.wav'));
@@ -173,7 +190,7 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
         if (!didPop) _leaveToMenu();
       },
       child: Scaffold(
-        appBar: AppBar(title: const Text('Modo Clásico')),
+        appBar: AppBar(title: Text(widget.title)),
         body: SafeArea(
           child: state.phase == ClassicPhase.ready
               ? _buildReady(context, state)
@@ -192,22 +209,21 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
-          constraints:
-              const BoxConstraints(maxWidth: AppLayout.maxFocusWidth),
+          constraints: const BoxConstraints(maxWidth: AppLayout.maxFocusWidth),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Icon(Icons.lightbulb_outline, size: 64, color: scheme.primary),
               const SizedBox(height: 16),
               Text(
-                'Memorizá la secuencia y repetila',
-                style: textTheme.titleLarge?.copyWith(
+                widget.title,
+                style: textTheme.headlineSmall?.copyWith(
                   fontWeight: FontWeight.bold,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Cada ronda suma un color más. Un error y terminás.',
+                widget.subtitle,
                 textAlign: TextAlign.center,
                 style: textTheme.bodyMedium?.copyWith(
                   color: scheme.onSurfaceVariant,
@@ -255,9 +271,7 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
             _statusMessage(state),
             textAlign: TextAlign.center,
             style: textTheme.titleMedium?.copyWith(
-              color: roundCleared
-                  ? AppPalette.mint
-                  : scheme.onSurfaceVariant,
+              color: roundCleared ? AppPalette.mint : scheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
