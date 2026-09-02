@@ -7,11 +7,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:chroma_memory/app/app.dart';
+import 'package:chroma_memory/core/utils/audio_manager.dart';
 
 void main() {
   setUp(() {
     // El Modo Clásico guarda el récord en shared_preferences.
     SharedPreferences.setMockInitialValues(<String, Object>{});
+    // Sin audio en tests (evita el canal de plugin de audioplayers).
+    AudioManager.instance.enabled = false;
   });
 
   Future<void> pumpApp(WidgetTester tester) async {

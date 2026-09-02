@@ -9,6 +9,7 @@ import '../../../../core/accessibility/color_vision_mode.dart';
 import '../../../../core/constants/app_palette.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/layout/responsive.dart';
+import '../../../../core/utils/audio_manager.dart';
 import '../../../../core/utils/haptic_feedback.dart';
 import '../../../../shared/domain/entities/color_block.dart';
 import '../viewmodels/classic_viewmodel.dart';
@@ -104,12 +105,15 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
       case TapOutcome.correct:
         _echoCorrect(id);
         await AppHaptics.light();
+        await AudioManager.instance.play('tap_ok.wav');
       case TapOutcome.roundCleared:
         _echoCorrect(id);
         await AppHaptics.medium();
+        await AudioManager.instance.play('round_ok.wav');
       case TapOutcome.wrong:
         _playError();
         await AppHaptics.heavy();
+        await AudioManager.instance.play('error.wav');
       case TapOutcome.none:
         break;
     }
@@ -148,6 +152,19 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
         _openResults();
       }
     });
+
+    // Tono del color en cada destello de la fase "ver" (sincronizado con la luz).
+    ref.listen<int?>(
+      classicViewModelProvider.select((ClassicState s) => s.watchIndex),
+      (int? prev, int? next) {
+        if (next == null) return;
+        final ClassicState current = ref.read(classicViewModelProvider);
+        if (next < current.sequence.length) {
+          final ColorId c = current.sequence.colors[next];
+          unawaited(AudioManager.instance.play('${c.name}.wav'));
+        }
+      },
+    );
 
     return PopScope(
       // Intercepta "volver" para detener la ronda antes de salir.
