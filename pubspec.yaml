@@ -37,6 +37,25 @@ dependencies:
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
 
+  # Gestión de estado (Riverpod 2.6)
+  # Nota: se usa Riverpod con providers manuales, SIN codegen. riverpod_generator y
+  # riverpod_annotation exigen analyzer>=6.6 -> package:_macros, ausente en Dart 3.12.2.
+  flutter_riverpod: ^2.6.1
+
+  # Almacenamiento local (Hive, sin generador de adapters: se guardan
+  # primitivas/listas/mapas o TypeAdapters manuales si hicieran falta)
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+
+  # Sonido (feedback háptico se maneja con HapticFeedback nativo de Flutter,
+  # ver core/utils/haptic_feedback.dart)
+  audioplayers: ^6.2.0
+
+  # Utilidades (opcional pero útil)
+  equatable: ^2.0.5
+  path_provider: ^2.1.5
+  shared_preferences: ^2.5.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -47,6 +66,9 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
+  # build_runner, riverpod_generator, riverpod_annotation y hive_generator se
+  # retiraron: su cadena de analyzer exige package:_macros (no disponible en el
+  # Dart SDK 3.12.2 de Flutter stable). Providers Riverpod manuales + Hive directo.
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
