@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/accessibility/accessibility_controller.dart';
 import '../../../../core/accessibility/color_vision_mode.dart';
 import '../../../../core/di/injection_container.dart';
+import '../../../../core/layout/responsive.dart';
 import '../../../../core/utils/haptic_feedback.dart';
 import '../../../../shared/domain/entities/color_block.dart';
 import '../viewmodels/classic_viewmodel.dart';
@@ -182,7 +183,7 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
           Expanded(
             child: Center(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 440),
+                constraints: const BoxConstraints(maxWidth: AppLayout.maxGameWidth),
                 child: ClassicGrid(
                   state: state,
                   vision: vision,

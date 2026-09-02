@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_constants.dart';
+import '../../core/layout/responsive.dart';
 import '../router.dart';
 
 /// Menú principal: entrada a los tres modos de juego.
@@ -26,9 +27,11 @@ class HomePage extends StatelessWidget {
 
     return Scaffold(
       body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
+        child: AppLayout.panel(
+          context,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
             // Encabezado con la marca.
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
@@ -101,7 +104,8 @@ class HomePage extends StatelessWidget {
                 ],
               ),
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );

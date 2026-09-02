@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/accessibility/accessibility_controller.dart';
 import '../../core/accessibility/color_vision_mode.dart';
+import '../../core/layout/responsive.dart';
 import '../../shared/domain/entities/color_block.dart';
 import '../../shared/presentation/widgets/color_block_widget.dart';
 
@@ -22,8 +23,8 @@ class SettingsPage extends ConsumerWidget {
         child: ListView(
           padding: const EdgeInsets.all(24),
           children: <Widget>[
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 560),
+            AppLayout.panel(
+              context,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
