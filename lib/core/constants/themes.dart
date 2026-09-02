@@ -72,6 +72,12 @@ abstract final class AppTheme {
       textTheme: base,
       scaffoldBackgroundColor: AppPalette.voidBg,
       splashFactory: InkRipple.splashFactory,
+      // Transición de pantallas: fade + deslizamiento sutil (no zoom genérico).
+      pageTransitionsTheme: const PageTransitionsTheme(
+        builders: <TargetPlatform, PageTransitionsBuilder>{
+          TargetPlatform.android: _ChromaTransitionsBuilder(),
+        },
+      ),
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,
@@ -125,4 +131,34 @@ abstract final class AppTheme {
         500 => FontWeight.w500,
         _ => FontWeight.w400,
       };
+}
+
+/// Transición por defecto de las rutas: fade + micro-slide vertical.
+class _ChromaTransitionsBuilder extends PageTransitionsBuilder {
+  const _ChromaTransitionsBuilder();
+
+  @override
+  Widget buildTransitions<T>(
+    PageRoute<T> route,
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) {
+    final CurvedAnimation curved = CurvedAnimation(
+      parent: animation,
+      curve: Curves.easeOutCubic,
+      reverseCurve: Curves.easeInCubic,
+    );
+    return FadeTransition(
+      opacity: curved,
+      child: SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 0.03),
+          end: Offset.zero,
+        ).animate(curved),
+        child: child,
+      ),
+    );
+  }
 }

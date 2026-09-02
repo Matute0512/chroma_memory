@@ -9,22 +9,26 @@ import '../viewmodels/classic_viewmodel.dart';
 ///
 /// [enabled] deshabilita el toque (durante la fase "ver", pausas, etc.).
 /// [vision] define si se pintan las texturas de accesibilidad.
+/// [pulseId] es la ficha que hace un "eco" de luz al acertar (feedback breve).
 class ClassicGrid extends StatelessWidget {
   const ClassicGrid({
     super.key,
     required this.state,
     required this.vision,
     required this.onColorTap,
+    this.pulseId,
   });
 
   final ClassicState state;
   final ColorVisionMode vision;
   final ValueChanged<ColorId> onColorTap;
+  final ColorId? pulseId;
 
   @override
   Widget build(BuildContext context) {
     final bool enabled = state.isInputEnabled;
     final List<ColorId> order = ColorId.values;
+    final bool watching = state.phase == ClassicPhase.watching;
 
     return AspectRatio(
       aspectRatio: 1,
@@ -46,9 +50,10 @@ class ClassicGrid extends StatelessWidget {
                     id: id,
                     onTap: enabled ? () => onColorTap(id) : null,
                     vision: vision,
-                    highlighted: state.phase == ClassicPhase.watching &&
-                        state.watchIndex != null &&
-                        state.sequence.colors[state.watchIndex!] == id,
+                    highlighted: (watching &&
+                            state.watchIndex != null &&
+                            state.sequence.colors[state.watchIndex!] == id) ||
+                        pulseId == id,
                   ),
                 ),
             ],

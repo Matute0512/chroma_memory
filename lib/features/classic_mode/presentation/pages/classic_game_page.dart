@@ -1,8 +1,12 @@
+import 'dart:async';
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/accessibility/accessibility_controller.dart';
 import '../../../../core/accessibility/color_vision_mode.dart';
+import '../../../../core/constants/app_palette.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/layout/responsive.dart';
 import '../../../../core/utils/haptic_feedback.dart';
@@ -13,10 +17,24 @@ import '../widgets/classic_score_bar.dart';
 import '../widgets/classic_sequence_display.dart';
 import 'classic_results_page.dart';
 
+/// Matriz de desaturación (escala de grises). Se usa el instante del error.
+const List<double> _kGrayscaleMatrix = <double>[
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0.2126, 0.7152, 0.0722, 0, 0, //
+  0, 0, 0, 1, 0,
+];
+
+final ColorFilter _kNormalFilter =
+    ColorFilter.mode(Colors.white, BlendMode.dst);
+final ColorFilter _kDesaturatedFilter = ColorFilter.matrix(_kGrayscaleMatrix);
+
 /// Pantalla del Modo Clásico (Simon-like).
 ///
-/// Orquesta la UI con el [ClassicViewModel]: arranca la partida, reacciona a
-/// los toques con hápticos y navega a resultados cuando termina.
+/// Orquesta la UI con el [ClassicViewModel] y los micro-feedback premium:
+/// - acierto → "eco" de luz en la ficha + háptico light;
+/// - ronda superada → háptico medium;
+/// - error → shake del tablero + desaturación momentánea + háptico heavy.
 class ClassicGamePage extends ConsumerStatefulWidget {
   const ClassicGamePage({super.key});
 
@@ -24,10 +42,22 @@ class ClassicGamePage extends ConsumerStatefulWidget {
   ConsumerState<ClassicGamePage> createState() => _ClassicGamePageState();
 }
 
-class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
+class _ClassicGamePageState extends ConsumerState<ClassicGamePage>
+    with SingleTickerProviderStateMixin {
+  Timer? _pulseTimer;
+  Timer? _saturationTimer;
+  ColorId? _pulseId;
+
+  late final AnimationController _shakeController;
+  bool _desaturated = false;
+
   @override
   void initState() {
     super.initState();
+    _shakeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 520),
+    );
     // Carga el récord para mostrarlo en la pantalla inicial.
     Future<void>.microtask(() {
       if (mounted) {
@@ -36,14 +66,35 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
     });
   }
 
+  @override
+  void dispose() {
+    _pulseTimer?.cancel();
+    _saturationTimer?.cancel();
+    _shakeController.dispose();
+    super.dispose();
+  }
+
   Future<void> _startGame() async {
     await ref.read(classicViewModelProvider.notifier).newGame();
   }
 
-  /// Sale al menú deteniendo la partida (si estaba a mitad de ronda).
-  void _leaveToMenu() {
-    ref.read(classicViewModelProvider.notifier).resetToReady();
-    Navigator.of(context).pop();
+  /// "Eco" de luz sobre la ficha que se acertó.
+  void _echoCorrect(ColorId id) {
+    _pulseTimer?.cancel();
+    setState(() => _pulseId = id);
+    _pulseTimer = Timer(const Duration(milliseconds: 160), () {
+      if (mounted) setState(() => _pulseId = null);
+    });
+  }
+
+  /// Shake + desaturación breve al fallar.
+  void _playError() {
+    _shakeController.forward(from: 0);
+    _saturationTimer?.cancel();
+    setState(() => _desaturated = true);
+    _saturationTimer = Timer(const Duration(milliseconds: 300), () {
+      if (mounted) setState(() => _desaturated = false);
+    });
   }
 
   Future<void> _onColorTap(ColorId id) async {
@@ -51,9 +102,13 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
         await ref.read(classicViewModelProvider.notifier).onTile(id);
     switch (outcome) {
       case TapOutcome.correct:
-      case TapOutcome.roundCleared:
+        _echoCorrect(id);
         await AppHaptics.light();
+      case TapOutcome.roundCleared:
+        _echoCorrect(id);
+        await AppHaptics.medium();
       case TapOutcome.wrong:
+        _playError();
         await AppHaptics.heavy();
       case TapOutcome.none:
         break;
@@ -73,6 +128,12 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
     } else {
       Navigator.of(context).popUntil((Route<void> route) => route.isFirst);
     }
+  }
+
+  /// Salta al menú deteniendo la partida (si estaba a mitad de ronda).
+  void _leaveToMenu() {
+    ref.read(classicViewModelProvider.notifier).resetToReady();
+    Navigator.of(context).pop();
   }
 
   @override
@@ -114,7 +175,8 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints:
+              const BoxConstraints(maxWidth: AppLayout.maxFocusWidth),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
@@ -163,6 +225,7 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
   ) {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final TextTheme textTheme = Theme.of(context).textTheme;
+    final bool roundCleared = state.phase == ClassicPhase.roundCleared;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
@@ -175,19 +238,40 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
             _statusMessage(state),
             textAlign: TextAlign.center,
             style: textTheme.titleMedium?.copyWith(
-              color: scheme.onSurfaceVariant,
+              color: roundCleared
+                  ? AppPalette.mint
+                  : scheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: 16),
           Expanded(
             child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: AppLayout.maxGameWidth),
-                child: ClassicGrid(
-                  state: state,
-                  vision: vision,
-                  onColorTap: _onColorTap,
+              child: AnimatedBuilder(
+                animation: _shakeController,
+                builder: (BuildContext context, Widget? child) {
+                  final double v = _shakeController.value;
+                  final double dx =
+                      v > 0 ? math.sin(v * math.pi * 6) * (10 * (1 - v)) : 0;
+                  return Transform.translate(
+                    offset: Offset(dx, 0),
+                    child: ColorFiltered(
+                      colorFilter:
+                          _desaturated ? _kDesaturatedFilter : _kNormalFilter,
+                      child: child,
+                    ),
+                  );
+                },
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppLayout.maxGameWidth,
+                  ),
+                  child: ClassicGrid(
+                    state: state,
+                    vision: vision,
+                    onColorTap: _onColorTap,
+                    pulseId: _pulseId,
+                  ),
                 ),
               ),
             ),
