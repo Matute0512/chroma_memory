@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../features/classic_mode/presentation/pages/classic_game_page.dart';
 import 'pages/home_page.dart';
+import 'pages/settings_page.dart';
 
 /// Rutas con nombre de la aplicación.
 ///
@@ -15,8 +16,12 @@ abstract final class AppRoutes {
   /// Modo Clásico.
   static const String classic = '/classic';
 
+  /// Ajustes (accesibilidad).
+  static const String settings = '/settings';
+
   static final Map<String, WidgetBuilder> table = <String, WidgetBuilder>{
     home: (_) => const HomePage(),
     classic: (_) => const ClassicGamePage(),
+    settings: (_) => const SettingsPage(),
   };
 }

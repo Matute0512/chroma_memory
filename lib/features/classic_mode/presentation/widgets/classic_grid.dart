@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/accessibility/color_vision_mode.dart';
 import '../../../../shared/domain/entities/color_block.dart';
 import '../../../../shared/presentation/widgets/color_block_widget.dart';
 import '../viewmodels/classic_viewmodel.dart';
@@ -7,14 +8,17 @@ import '../viewmodels/classic_viewmodel.dart';
 /// Grilla 2×2 de fichas de color.
 ///
 /// [enabled] deshabilita el toque (durante la fase "ver", pausas, etc.).
+/// [vision] define si se pintan las texturas de accesibilidad.
 class ClassicGrid extends StatelessWidget {
   const ClassicGrid({
     super.key,
     required this.state,
+    required this.vision,
     required this.onColorTap,
   });
 
   final ClassicState state;
+  final ColorVisionMode vision;
   final ValueChanged<ColorId> onColorTap;
 
   @override
@@ -41,6 +45,7 @@ class ClassicGrid extends StatelessWidget {
                     key: ValueKey<String>('tile_${id.name}'),
                     id: id,
                     onTap: enabled ? () => onColorTap(id) : null,
+                    vision: vision,
                     highlighted: state.phase == ClassicPhase.watching &&
                         state.watchIndex != null &&
                         state.sequence.colors[state.watchIndex!] == id,

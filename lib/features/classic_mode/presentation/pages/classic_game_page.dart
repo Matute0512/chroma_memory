@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/accessibility/accessibility_controller.dart';
+import '../../../../core/accessibility/color_vision_mode.dart';
 import '../../../../core/di/injection_container.dart';
 import '../../../../core/utils/haptic_feedback.dart';
 import '../../../../shared/domain/entities/color_block.dart';
@@ -75,6 +77,7 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
   @override
   Widget build(BuildContext context) {
     final ClassicState state = ref.watch(classicViewModelProvider);
+    final ColorVisionMode vision = ref.watch(accessibilityProvider);
 
     // Cuando termina la partida, ir a resultados (una sola vez por estado).
     ref.listen<ClassicState>(classicViewModelProvider, (ClassicState? prev, ClassicState next) {
@@ -95,7 +98,7 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
         body: SafeArea(
           child: state.phase == ClassicPhase.ready
               ? _buildReady(context, state)
-              : _buildGame(context, state),
+              : _buildGame(context, state, vision),
         ),
       ),
     );
@@ -152,7 +155,11 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
   }
 
   /// Tablero de juego en plena partida.
-  Widget _buildGame(BuildContext context, ClassicState state) {
+  Widget _buildGame(
+    BuildContext context,
+    ClassicState state,
+    ColorVisionMode vision,
+  ) {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final TextTheme textTheme = Theme.of(context).textTheme;
 
@@ -176,7 +183,11 @@ class _ClassicGamePageState extends ConsumerState<ClassicGamePage> {
             child: Center(
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 440),
-                child: ClassicGrid(state: state, onColorTap: _onColorTap),
+                child: ClassicGrid(
+                  state: state,
+                  vision: vision,
+                  onColorTap: _onColorTap,
+                ),
               ),
             ),
           ),

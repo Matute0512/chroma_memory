@@ -1,5 +1,7 @@
-// Pruebas del shell de la app (menú, navegación) y del MVP del Modo Clásico.
+// Pruebas del shell de la app (menú, navegación), del MVP del Modo Clásico
+// y de los ajustes de accesibilidad.
 
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -68,5 +70,31 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
 
     expect(find.text('Tu turno: repetí la secuencia'), findsOneWidget);
+  });
+
+  testWidgets('elegir un modo daltónico activa las texturas en la vista previa',
+      (WidgetTester tester) async {
+    // Viewport alto para que todas las opciones queden visibles sin scroll.
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await pumpApp(tester);
+
+    await tester.tap(find.byIcon(Icons.settings_outlined));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Modo daltónico'), findsOneWidget);
+
+    // Sin modo elegido no hay texturas.
+    expect(find.byKey(const ValueKey<String>('pattern_red')), findsNothing);
+
+    await tester.tap(find.text('Deuteranopía'));
+    await tester.pump();
+
+    // La vista previa ahora pinta el patrón de la ficha roja.
+    expect(find.byKey(const ValueKey<String>('pattern_red')), findsOneWidget);
+    expect(find.textContaining('cada una tiene su patrón'), findsOneWidget);
   });
 }

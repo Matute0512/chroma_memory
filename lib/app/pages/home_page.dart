@@ -60,6 +60,12 @@ class HomePage extends StatelessWidget {
                       ],
                     ),
                   ),
+                  IconButton(
+                    onPressed: () =>
+                        Navigator.of(context).pushNamed(AppRoutes.settings),
+                    tooltip: 'Accesibilidad',
+                    icon: const Icon(Icons.settings_outlined),
+                  ),
                 ],
               ),
             ),
