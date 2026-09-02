@@ -1,0 +1,71 @@
+# ============================
+# Flutter / Dart
+# ============================
+.dart_tool/
+.pub/
+.pub-cache/
+.pub-data/
+build/
+flutter_*.png
+*.lock
+*.log
+*.pid
+*.tmp
+
+# ============================
+# Android (Gradle, keystores, etc.)
+# ============================
+android/.gradle/
+android/.idea/
+android/build/
+android/local.properties
+android/app/build/
+android/app/src/main/debug/
+android/app/src/main/profile/
+android/app/src/main/release/
+*.keystore
+*.jks
+google-services.json
+*.properties
+
+# ============================
+# iOS (si decides compilar para iOS)
+# ============================
+ios/Flutter/App.framework
+ios/Flutter/Flutter.framework
+ios/Flutter/Generated.xcconfig
+ios/Pods/
+ios/Podfile.lock
+ios/.symlinks/
+ios/*.xcworkspace/xcuserdata/
+ios/*.xcworkspace/contents.xcworkspacedata
+
+# ============================
+# Entornos de desarrollo (VS Code, Android Studio, IntelliJ)
+# ============================
+.vscode/
+.idea/
+*.iml
+*.iws
+*.ipr
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ============================
+# Archivos de cobertura / tests
+# ============================
+coverage/
+*.lcov
+test/.test_cache/
+
+# ============================
+# Archivos de entorno / secrets
+# ============================
+.env
+.env.*
+!env.example
+secrets.dart
+keys.dart
