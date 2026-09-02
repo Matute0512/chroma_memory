@@ -17,9 +17,10 @@ class ChromaMemoryApp extends StatelessWidget {
     return MaterialApp(
       title: AppConstants.appName,
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
+      // Identidad dark neon: oscuro obligatorio (no hay tema claro).
+      theme: AppTheme.dark,
       darkTheme: AppTheme.dark,
-      themeMode: ThemeMode.system,
+      themeMode: ThemeMode.dark,
       initialRoute: AppRoutes.home,
       routes: AppRoutes.table,
     );

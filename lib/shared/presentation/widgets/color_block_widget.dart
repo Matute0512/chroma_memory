@@ -1,18 +1,28 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/accessibility/color_vision_mode.dart';
+import '../../../core/constants/app_palette.dart';
 import '../../domain/entities/color_block.dart';
 import 'accessibility_pattern_overlay.dart';
 
 /// Colores "de pantalla" para cada ficha (mapeo presentación → dominio).
 ///
-/// Tono base vivo que funciona sobre superficies claras y oscuras.
+/// Tono base + glow: el destello usa el glow del propio color, no un blanqueo
+/// genérico (ver app_palette.dart).
 extension ColorIdVisuals on ColorId {
   Color get color => switch (this) {
-        ColorId.red => const Color(0xFFE53935),
-        ColorId.green => const Color(0xFF43A047),
-        ColorId.blue => const Color(0xFF1E88E5),
-        ColorId.yellow => const Color(0xFFF9A825),
+        ColorId.red => AppPalette.tileEmber,
+        ColorId.green => AppPalette.tileMint,
+        ColorId.blue => AppPalette.tileAzure,
+        ColorId.yellow => AppPalette.tileAmber,
+      };
+
+  /// Halo del color de la ficha (se usa en el destello).
+  Color get glow => switch (this) {
+        ColorId.red => AppPalette.glowEmber,
+        ColorId.green => AppPalette.glowMint,
+        ColorId.blue => AppPalette.glowAzure,
+        ColorId.yellow => AppPalette.glowAmber,
       };
 
   String get label => switch (this) {
@@ -25,7 +35,8 @@ extension ColorIdVisuals on ColorId {
 
 /// Ficha de color táctil del tablero.
 ///
-/// [highlighted] enciende la ficha (destello de la fase "ver").
+/// [highlighted] enciende la ficha (destello de la fase "ver") con un halo del
+/// color de la propia ficha.
 /// [vision] activa la textura de accesibilidad correspondiente al modo
 /// daltónico elegido (ver core/accessibility).
 class ColorBlockWidget extends StatelessWidget {
@@ -46,7 +57,7 @@ class ColorBlockWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final Color base = id.color;
     final Color display =
-        highlighted ? (Color.lerp(base, Colors.white, 0.4) ?? base) : base;
+        highlighted ? (Color.lerp(base, Colors.white, 0.25) ?? base) : base;
     final bool usesPatterns = vision.usesPatterns;
 
     final String semanticLabel = usesPatterns
@@ -62,18 +73,25 @@ class ColorBlockWidget extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
           color: display,
+          border: Border.all(color: AppPalette.hairline),
           boxShadow: highlighted
               ? <BoxShadow>[
                   BoxShadow(
-                    color: base.withValues(alpha: 0.55),
-                    blurRadius: 26,
-                    spreadRadius: 6,
+                    color: id.glow.withValues(alpha: 0.55),
+                    blurRadius: 34,
+                    spreadRadius: 4,
                   ),
                 ]
-              : null,
+              : <BoxShadow>[
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(21),
           child: Stack(
             fit: StackFit.expand,
             children: <Widget>[

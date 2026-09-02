@@ -53,3 +53,6 @@ graphify-out/
 
 # Documentación de desarrollo (bitácora de implementación, no se versiona)
 /IMPLEMENTACION.md
+
+# Guías de diseño (archivos de trabajo, no se versionan)
+/design/
