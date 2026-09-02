@@ -1,7 +1,8 @@
 import '../datasources/classic_local_datasource.dart';
 import '../../domain/repositories/i_classic_repository.dart';
 
-/// Implementación del repositorio del Modo Clásico sobre la fuente local.
+/// Implementación del repositorio de un modo de secuencias sobre la fuente
+/// local (récord propio + último reto completado).
 class ClassicRepositoryImpl implements IClassicRepository {
   const ClassicRepositoryImpl(this._dataSource);
 
@@ -12,4 +13,11 @@ class ClassicRepositoryImpl implements IClassicRepository {
 
   @override
   Future<void> saveBestScore(int score) => _dataSource.writeBestScore(score);
+
+  @override
+  Future<String?> lastCompleted() => _dataSource.readLastCompleted();
+
+  @override
+  Future<void> markCompleted(String key) =>
+      _dataSource.writeLastCompleted(key);
 }

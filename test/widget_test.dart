@@ -19,6 +19,8 @@ void main() {
 
   Future<void> pumpApp(WidgetTester tester) async {
     await tester.pumpWidget(const ProviderScope(child: ChromaMemoryApp()));
+    // Deja pasar el splash de marca hasta quedar en el menú.
+    await tester.pumpAndSettle();
   }
 
   testWidgets('el menú principal muestra las tres opciones de modo',

@@ -66,6 +66,9 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
   late final AnimationController _shakeController;
   bool _desaturated = false;
 
+  /// Desafío Diario: si el reto de hoy ya se completó (bloquea "Comenzar").
+  bool _completedToday = false;
+
   @override
   void initState() {
     super.initState();
@@ -73,12 +76,19 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
       vsync: this,
       duration: const Duration(milliseconds: 520),
     );
-    // Carga el récord para mostrarlo en la pantalla inicial.
-    Future<void>.microtask(() {
-      if (mounted) {
-        ref.read(widget.provider.notifier).loadBestScore();
-      }
-    });
+    Future<void>.microtask(_prepare);
+  }
+
+  /// Deja la partida en ready, carga el récord y (Diario) chequea si ya se
+  /// completó el reto de hoy.
+  Future<void> _prepare() async {
+    if (!mounted) return;
+    final ClassicViewModel vm = ref.read(widget.provider.notifier);
+    vm.resetToReady();
+    await vm.loadBestScore();
+    final bool done = await vm.isTodayCompleted();
+    if (!mounted) return;
+    if (done != _completedToday) setState(() => _completedToday = done);
   }
 
   @override
@@ -213,7 +223,13 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Icon(Icons.lightbulb_outline, size: 64, color: scheme.primary),
+              Icon(
+                _completedToday
+                    ? Icons.check_circle_outline
+                    : Icons.lightbulb_outline,
+                size: 64,
+                color: _completedToday ? AppPalette.mint : scheme.primary,
+              ),
               const SizedBox(height: 16),
               Text(
                 widget.title,
@@ -235,14 +251,42 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
                 style: textTheme.bodySmall?.copyWith(color: scheme.primary),
               ),
               const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton.icon(
-                  onPressed: _startGame,
-                  icon: const Icon(Icons.play_arrow),
-                  label: const Text('Comenzar'),
+              if (_completedToday)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  decoration: BoxDecoration(
+                    color: AppPalette.mint.withValues(alpha: 0.10),
+                    border: Border.all(
+                      color: AppPalette.mint.withValues(alpha: 0.5),
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: <Widget>[
+                      const Icon(Icons.check_circle,
+                          size: 20, color: AppPalette.mint),
+                      const SizedBox(width: 8),
+                      Text(
+                        '¡Reto completado hoy!',
+                        style: textTheme.titleSmall?.copyWith(
+                          color: AppPalette.mint,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _startGame,
+                    icon: const Icon(Icons.play_arrow),
+                    label: const Text('Comenzar'),
+                  ),
                 ),
-              ),
             ],
           ),
         ),

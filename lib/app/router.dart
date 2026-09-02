@@ -4,12 +4,16 @@ import '../core/di/injection_container.dart';
 import '../features/classic_mode/presentation/pages/sequence_mode_page.dart';
 import 'pages/home_page.dart';
 import 'pages/settings_page.dart';
+import 'pages/splash_page.dart';
 
 /// Rutas con nombre de la aplicación.
 ///
 /// Los modos de secuencias comparten [SequenceModePage] y difieren en título,
 /// descripción y provider (reglas + persistencia de cada modo).
 abstract final class AppRoutes {
+  /// Splash de marca.
+  static const String splash = '/splash';
+
   /// Menú principal.
   static const String home = '/';
 
@@ -26,6 +30,7 @@ abstract final class AppRoutes {
   static const String settings = '/settings';
 
   static final Map<String, WidgetBuilder> table = <String, WidgetBuilder>{
+    splash: (_) => const SplashPage(),
     home: (_) => const HomePage(),
     classic: (_) => SequenceModePage(
           title: 'Modo Clásico',

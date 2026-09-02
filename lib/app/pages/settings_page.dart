@@ -3,11 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/accessibility/accessibility_controller.dart';
 import '../../core/accessibility/color_vision_mode.dart';
+import '../../core/audio/audio_preferences.dart';
 import '../../core/layout/responsive.dart';
 import '../../shared/domain/entities/color_block.dart';
 import '../../shared/presentation/widgets/color_block_widget.dart';
 
-/// Ajustes de accesibilidad: modo daltónico con texturas en las fichas.
+/// Ajustes: sonido y accesibilidad (modo daltónico con texturas).
 class SettingsPage extends ConsumerWidget {
   const SettingsPage({super.key});
 
@@ -16,9 +17,10 @@ class SettingsPage extends ConsumerWidget {
     final ColorScheme scheme = Theme.of(context).colorScheme;
     final TextTheme textTheme = Theme.of(context).textTheme;
     final ColorVisionMode mode = ref.watch(accessibilityProvider);
+    final bool soundOn = ref.watch(soundEnabledProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Accesibilidad')),
+      appBar: AppBar(title: const Text('Ajustes')),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.all(24),
@@ -28,6 +30,41 @@ class SettingsPage extends ConsumerWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: <Widget>[
+                  // ---- Sonido ----
+                  Text(
+                    'Sonido',
+                    style: textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Tonos por color en los destellos y efectos de la partida.',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Card(
+                    elevation: 0,
+                    margin: EdgeInsets.zero,
+                    color: scheme.surfaceContainerLow,
+                    clipBehavior: Clip.antiAlias,
+                    child: SwitchListTile(
+                      secondary: Icon(
+                        soundOn ? Icons.volume_up : Icons.volume_off,
+                        color: soundOn ? scheme.primary : scheme.outline,
+                      ),
+                      title: const Text('Sonido'),
+                      value: soundOn,
+                      onChanged: (bool value) => ref
+                          .read(soundEnabledProvider.notifier)
+                          .setEnabled(value),
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+
+                  // ---- Accesibilidad ----
                   Text(
                     'Modo daltónico',
                     style: textTheme.titleLarge?.copyWith(

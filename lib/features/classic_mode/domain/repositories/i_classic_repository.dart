@@ -8,4 +8,10 @@ abstract interface class IClassicRepository {
 
   /// Guarda un nuevo mejor puntaje.
   Future<void> saveBestScore(int score);
+
+  /// Clave del último reto completado (Desafío Diario: 'aaaaMMdd'), o null.
+  Future<String?> lastCompleted();
+
+  /// Registra un reto como completado (por ejemplo, el día de hoy).
+  Future<void> markCompleted(String key);
 }

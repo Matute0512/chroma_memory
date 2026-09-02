@@ -194,6 +194,15 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
     }
   }
 
+  /// true si el reto de hoy (Desafío Diario) ya se completó. En Clásico y
+  /// Zen (sin [SequenceRules.fixedSeed]) siempre devuelve false.
+  Future<bool> isTodayCompleted() async {
+    final int? seed = rules.fixedSeed;
+    if (seed == null) return false;
+    final String? last = await _repository.lastCompleted();
+    return last == seed.toString();
+  }
+
   /// Arranca una partida nueva.
   Future<void> newGame() async {
     _token++;
@@ -272,7 +281,9 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
     if (token != _token) return TapOutcome.roundCleared;
 
     if (!rules.growRounds) {
-      // Desafío Diario: la secuencia única se completó.
+      // Desafío Diario: la secuencia única se completó → se marca el día.
+      final String? key = rules.fixedSeed?.toString();
+      if (key != null) unawaited(_repository.markCompleted(key));
       state = state.copyWith(phase: ClassicPhase.gameOver, completed: true);
       return TapOutcome.roundCleared;
     }
