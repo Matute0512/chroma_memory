@@ -10,6 +10,9 @@ import '../../../../core/constants/app_palette.dart';
 import '../../../../core/layout/responsive.dart';
 import '../../../../core/utils/audio_manager.dart';
 import '../../../../core/utils/haptic_feedback.dart';
+import '../../../../core/widgets/ambient_backdrop.dart';
+import '../../../../core/widgets/chroma_button.dart';
+import '../../../../core/widgets/glow_card.dart';
 import '../../../../shared/domain/entities/color_block.dart';
 import '../viewmodels/classic_viewmodel.dart';
 import '../widgets/classic_grid.dart';
@@ -25,8 +28,10 @@ const List<double> _kGrayscaleMatrix = <double>[
   0, 0, 0, 1, 0,
 ];
 
-final ColorFilter _kNormalFilter =
-    ColorFilter.mode(Colors.white, BlendMode.dst);
+final ColorFilter _kNormalFilter = ColorFilter.mode(
+  Colors.white,
+  BlendMode.dst,
+);
 final ColorFilter _kDesaturatedFilter = ColorFilter.matrix(_kGrayscaleMatrix);
 
 /// Pantalla de un modo de secuencias (Clásico / Desafío Diario / Zen).
@@ -36,6 +41,10 @@ final ColorFilter _kDesaturatedFilter = ColorFilter.matrix(_kGrayscaleMatrix);
 /// - acierto → "eco" de luz en la ficha + háptico light;
 /// - ronda superada → háptico medium;
 /// - error → shake + desaturación breve + háptico heavy (en Zen se continúa).
+///
+/// HUD inmersivo: sin AppBar; una barra superior fina (volver + modo + pausa)
+/// y el tablero como protagonista. La pausa solo aplica durante el turno del
+/// jugador (ver [ClassicViewModel.pause]).
 class SequenceModePage extends ConsumerStatefulWidget {
   const SequenceModePage({
     super.key,
@@ -44,7 +53,7 @@ class SequenceModePage extends ConsumerStatefulWidget {
     required this.provider,
   });
 
-  /// Título del modo (AppBar y encabezado).
+  /// Título del modo (overline del HUD y encabezado inicial).
   final String title;
 
   /// Descripción breve en la pantalla inicial.
@@ -68,6 +77,9 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
 
   /// Desafío Diario: si el reto de hoy ya se completó (bloquea "Comenzar").
   bool _completedToday = false;
+
+  /// Espejo local de la pausa (para mostrar/ocultar el overlay al instante).
+  bool _paused = false;
 
   @override
   void initState() {
@@ -103,6 +115,23 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
     await ref.read(widget.provider.notifier).newGame();
   }
 
+  void _pauseGame() {
+    final ClassicState current = ref.read(widget.provider);
+    if (current.phase != ClassicPhase.input) return;
+    ref.read(widget.provider.notifier).pause();
+    setState(() => _paused = true);
+  }
+
+  void _resumeGame() {
+    ref.read(widget.provider.notifier).resume();
+    if (mounted) setState(() => _paused = false);
+  }
+
+  Future<void> _restartFromPause() async {
+    if (mounted) setState(() => _paused = false);
+    await _startGame();
+  }
+
   /// "Eco" de luz sobre la ficha que se acertó.
   void _echoCorrect(ColorId id) {
     _pulseTimer?.cancel();
@@ -123,8 +152,9 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
   }
 
   Future<void> _onColorTap(ColorId id) async {
-    final TapOutcome outcome =
-        await ref.read(widget.provider.notifier).onTile(id);
+    final TapOutcome outcome = await ref
+        .read(widget.provider.notifier)
+        .onTile(id);
     switch (outcome) {
       case TapOutcome.correct:
         _echoCorrect(id);
@@ -170,28 +200,30 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
     final ColorVisionMode vision = ref.watch(accessibilityProvider);
 
     // Cuando termina la partida, ir a resultados (una sola vez por estado).
-    ref.listen<ClassicState>(
-      widget.provider,
-      (ClassicState? prev, ClassicState next) {
-        if (next.phase == ClassicPhase.gameOver &&
-            prev?.phase != ClassicPhase.gameOver) {
-          _openResults();
-        }
-      },
-    );
+    ref.listen<ClassicState>(widget.provider, (
+      ClassicState? prev,
+      ClassicState next,
+    ) {
+      if (next.phase == ClassicPhase.gameOver &&
+          prev?.phase != ClassicPhase.gameOver) {
+        _openResults();
+      }
+    });
 
     // Tono del color en cada destello de la fase "ver" (sincronizado con luz).
-    ref.listen<int?>(
-      widget.provider.select((ClassicState s) => s.watchIndex),
-      (int? prev, int? next) {
-        if (next == null) return;
-        final ClassicState current = ref.read(widget.provider);
-        if (next < current.sequence.length) {
-          final ColorId c = current.sequence.colors[next];
-          unawaited(AudioManager.instance.play('${c.name}.wav'));
-        }
-      },
-    );
+    ref.listen<int?>(widget.provider.select((ClassicState s) => s.watchIndex), (
+      int? prev,
+      int? next,
+    ) {
+      if (next == null) return;
+      final ClassicState current = ref.read(widget.provider);
+      if (next < current.sequence.length) {
+        final ColorId c = current.sequence.colors[next];
+        unawaited(AudioManager.instance.play('${c.name}.wav'));
+      }
+    });
+
+    final bool inGame = state.phase != ClassicPhase.ready;
 
     return PopScope(
       // Intercepta "volver" para detener la ronda antes de salir.
@@ -200,12 +232,77 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
         if (!didPop) _leaveToMenu();
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(widget.title)),
-        body: SafeArea(
-          child: state.phase == ClassicPhase.ready
-              ? _buildReady(context, state)
-              : _buildGame(context, state, vision),
+        body: AmbientBackdrop(
+          child: SafeArea(
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                Column(
+                  children: <Widget>[
+                    _buildTopBar(context, state),
+                    Expanded(
+                      child: state.phase == ClassicPhase.ready
+                          ? _buildReady(context, state)
+                          : _buildGame(context, state, vision),
+                    ),
+                  ],
+                ),
+                // Overlay de pausa (solo durante una partida en curso).
+                if (inGame && _paused)
+                  _PauseOverlay(
+                    state: state,
+                    onResume: _resumeGame,
+                    onRestart: _restartFromPause,
+                    onMenu: _leaveToMenu,
+                  ),
+              ],
+            ),
+          ),
         ),
+      ),
+    );
+  }
+
+  /// Barra superior del HUD: volver + modo + pausa.
+  Widget _buildTopBar(BuildContext context, ClassicState state) {
+    final bool inGame = state.phase != ClassicPhase.ready;
+    final bool canPause = state.phase == ClassicPhase.input;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      child: Row(
+        children: <Widget>[
+          SizedBox(
+            width: 44,
+            height: 44,
+            child: _GlassBackButton(onPressed: _leaveToMenu),
+          ),
+          Expanded(
+            child: Text(
+              widget.title.toUpperCase(),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: AppPalette.textMid,
+                letterSpacing: 2.4,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+          SizedBox(
+            width: 44,
+            height: 44,
+            // El "volver" tiene ancho simétrico para que el título quede centrado.
+            child: inGame && canPause
+                ? _GlassIcon(
+                    icon: Icons.pause_rounded,
+                    tooltip: 'Pausar',
+                    onPressed: _pauseGame,
+                  )
+                : null,
+          ),
+        ],
       ),
     );
   }
@@ -265,8 +362,11 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: <Widget>[
-                      const Icon(Icons.check_circle,
-                          size: 20, color: AppPalette.mint),
+                      const Icon(
+                        Icons.check_circle,
+                        size: 20,
+                        color: AppPalette.mint,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         '¡Reto completado hoy!',
@@ -281,10 +381,11 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
               else
                 SizedBox(
                   width: double.infinity,
-                  child: FilledButton.icon(
+                  child: ChromaButton(
+                    icon: Icons.play_arrow,
+                    label: 'Comenzar',
+                    expanded: true,
                     onPressed: _startGame,
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('Comenzar'),
                   ),
                 ),
             ],
@@ -305,12 +406,12 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
     final bool roundCleared = state.phase == ClassicPhase.roundCleared;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+      padding: const EdgeInsets.fromLTRB(20, 6, 20, 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           ClassicScoreBar(state: state),
-          const SizedBox(height: 12),
+          const SizedBox(height: 10),
           Text(
             _statusMessage(state),
             textAlign: TextAlign.center,
@@ -319,20 +420,22 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
               fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Expanded(
             child: Center(
               child: AnimatedBuilder(
                 animation: _shakeController,
                 builder: (BuildContext context, Widget? child) {
                   final double v = _shakeController.value;
-                  final double dx =
-                      v > 0 ? math.sin(v * math.pi * 6) * (10 * (1 - v)) : 0;
+                  final double dx = v > 0
+                      ? math.sin(v * math.pi * 6) * (10 * (1 - v))
+                      : 0;
                   return Transform.translate(
                     offset: Offset(dx, 0),
                     child: ColorFiltered(
-                      colorFilter:
-                          _desaturated ? _kDesaturatedFilter : _kNormalFilter,
+                      colorFilter: _desaturated
+                          ? _kDesaturatedFilter
+                          : _kNormalFilter,
                       child: child,
                     ),
                   );
@@ -344,6 +447,7 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
                   child: ClassicGrid(
                     state: state,
                     vision: vision,
+                    enabled: !_paused && state.isInputEnabled,
                     onColorTap: _onColorTap,
                     pulseId: _pulseId,
                   ),
@@ -351,7 +455,7 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Center(child: ClassicSequenceDisplay(state: state)),
         ],
       ),
@@ -359,10 +463,146 @@ class _SequenceModePageState extends ConsumerState<SequenceModePage>
   }
 
   String _statusMessage(ClassicState state) => switch (state.phase) {
-        ClassicPhase.ready => '',
-        ClassicPhase.watching => 'Prestá atención…',
-        ClassicPhase.input => 'Tu turno: repetí la secuencia',
-        ClassicPhase.roundCleared => '¡Ronda ${state.round} superada!',
-        ClassicPhase.gameOver => '',
-      };
+    ClassicPhase.ready => '',
+    ClassicPhase.watching => 'Prestá atención…',
+    ClassicPhase.input => 'Tu turno: repetí la secuencia',
+    ClassicPhase.roundCleared => '¡Ronda ${state.round} superada!',
+    ClassicPhase.gameOver => '',
+  };
+}
+
+/// Botón "vidrio" del HUD: círculo discreto con hairline.
+class _GlassIcon extends StatelessWidget {
+  const _GlassIcon({required this.icon, required this.onPressed, this.tooltip});
+
+  final IconData icon;
+  final VoidCallback onPressed;
+  final String? tooltip;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget child = Material(
+      color: Colors.white.withValues(alpha: 0.04),
+      shape: const CircleBorder(),
+      child: InkWell(
+        onTap: onPressed,
+        customBorder: const CircleBorder(),
+        child: Icon(icon, size: 24, color: AppPalette.textHigh),
+      ),
+    );
+
+    if (tooltip == null) return child;
+    return Tooltip(message: tooltip!, child: child);
+  }
+}
+
+/// "Volver" de vidrio del HUD.
+///
+/// Usa un [BackButton] real (icono + tooltip localizado) para que la
+/// accesibilidad y los tests de navegación (`pageBack`) lo reconozcan. El pop
+/// lo intercepta el [PopScope] de la página (detiene la ronda antes de salir).
+class _GlassBackButton extends StatelessWidget {
+  const _GlassBackButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.04),
+      shape: const CircleBorder(),
+      child: BackButton(color: AppPalette.textHigh, onPressed: onPressed),
+    );
+  }
+}
+
+/// Overlay de pausa: barrera oscura + tarjeta de acciones.
+class _PauseOverlay extends StatelessWidget {
+  const _PauseOverlay({
+    required this.state,
+    required this.onResume,
+    required this.onRestart,
+    required this.onMenu,
+  });
+
+  final ClassicState state;
+  final VoidCallback onResume;
+  final VoidCallback onRestart;
+  final VoidCallback onMenu;
+
+  @override
+  Widget build(BuildContext context) {
+    final TextTheme textTheme = Theme.of(context).textTheme;
+
+    return Stack(
+      children: <Widget>[
+        const ModalBarrier(dismissible: false, color: AppPalette.scrim),
+        Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(
+                maxWidth: AppLayout.maxFocusWidth,
+              ),
+              child: GlowCard(
+                glow: AppPalette.cyan,
+                glowAlpha: 0.16,
+                padding: const EdgeInsets.fromLTRB(22, 26, 22, 22),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    Icon(
+                      Icons.pause_circle_outline,
+                      size: 52,
+                      color: AppPalette.cyan,
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'En pausa',
+                      textAlign: TextAlign.center,
+                      style: textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Ronda ${state.round} · Puntaje ${state.score}',
+                      textAlign: TextAlign.center,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: AppPalette.textMid,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ChromaButton(
+                      icon: Icons.play_arrow,
+                      label: 'Reanudar',
+                      expanded: true,
+                      onPressed: onResume,
+                    ),
+                    const SizedBox(height: 10),
+                    ChromaButton(
+                      variant: ChromaButtonVariant.secondary,
+                      icon: Icons.refresh,
+                      label: 'Reiniciar',
+                      expanded: true,
+                      onPressed: onRestart,
+                    ),
+                    const SizedBox(height: 10),
+                    ChromaButton(
+                      variant: ChromaButtonVariant.secondary,
+                      icon: Icons.home_outlined,
+                      label: 'Salir al menú',
+                      expanded: true,
+                      onPressed: onMenu,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
 }

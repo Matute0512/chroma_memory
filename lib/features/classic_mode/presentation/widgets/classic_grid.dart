@@ -7,26 +7,29 @@ import '../viewmodels/classic_viewmodel.dart';
 
 /// Grilla 2×2 de fichas de color.
 ///
-/// [enabled] deshabilita el toque (durante la fase "ver", pausas, etc.).
 /// [vision] define si se pintan las texturas de accesibilidad.
 /// [pulseId] es la ficha que hace un "eco" de luz al acertar (feedback breve).
+/// [enabled] permite bloquear el toque además de la fase (p. ej. al pausar);
+/// si es null se usa el estado de la fase ([ClassicState.isInputEnabled]).
 class ClassicGrid extends StatelessWidget {
   const ClassicGrid({
     super.key,
     required this.state,
     required this.vision,
     required this.onColorTap,
+    this.enabled,
     this.pulseId,
   });
 
   final ClassicState state;
   final ColorVisionMode vision;
   final ValueChanged<ColorId> onColorTap;
+  final bool? enabled;
   final ColorId? pulseId;
 
   @override
   Widget build(BuildContext context) {
-    final bool enabled = state.isInputEnabled;
+    final bool canTap = enabled ?? state.isInputEnabled;
     final List<ColorId> order = ColorId.values;
     final bool watching = state.phase == ClassicPhase.watching;
 
@@ -48,9 +51,10 @@ class ClassicGrid extends StatelessWidget {
                   child: ColorBlockWidget(
                     key: ValueKey<String>('tile_${id.name}'),
                     id: id,
-                    onTap: enabled ? () => onColorTap(id) : null,
+                    onTap: canTap ? () => onColorTap(id) : null,
                     vision: vision,
-                    highlighted: (watching &&
+                    highlighted:
+                        (watching &&
                             state.watchIndex != null &&
                             state.sequence.colors[state.watchIndex!] == id) ||
                         pulseId == id,

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../core/di/injection_container.dart';
 import '../features/classic_mode/presentation/pages/sequence_mode_page.dart';
 import 'pages/home_page.dart';
+import 'pages/leaderboard_page.dart';
 import 'pages/settings_page.dart';
 import 'pages/splash_page.dart';
 
@@ -29,24 +30,28 @@ abstract final class AppRoutes {
   /// Ajustes (accesibilidad).
   static const String settings = '/settings';
 
+  /// Tabla de clasificación local.
+  static const String leaderboard = '/leaderboard';
+
   static final Map<String, WidgetBuilder> table = <String, WidgetBuilder>{
     splash: (_) => const SplashPage(),
     home: (_) => const HomePage(),
     classic: (_) => SequenceModePage(
-          title: 'Modo Clásico',
-          subtitle: 'Cada ronda suma un color más. Un error y terminás.',
-          provider: classicViewModelProvider,
-        ),
+      title: 'Modo Clásico',
+      subtitle: 'Cada ronda suma un color más. Un error y terminás.',
+      provider: classicViewModelProvider,
+    ),
     daily: (_) => SequenceModePage(
-          title: 'Desafío Diario',
-          subtitle: 'El mismo reto para todos, cada 24 horas. Completalo hoy.',
-          provider: dailyViewModelProvider,
-        ),
+      title: 'Desafío Diario',
+      subtitle: 'El mismo reto para todos, cada 24 horas. Completalo hoy.',
+      provider: dailyViewModelProvider,
+    ),
     zen: (_) => SequenceModePage(
-          title: 'Modo Zen',
-          subtitle: 'Sin límites ni penalizaciones: aprendé a tu ritmo.',
-          provider: zenViewModelProvider,
-        ),
+      title: 'Modo Zen',
+      subtitle: 'Sin límites ni penalizaciones: aprendé a tu ritmo.',
+      provider: zenViewModelProvider,
+    ),
     settings: (_) => const SettingsPage(),
+    leaderboard: (_) => const LeaderboardPage(),
   };
 }

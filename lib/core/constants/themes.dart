@@ -78,6 +78,52 @@ abstract final class AppTheme {
           TargetPlatform.android: _ChromaTransitionsBuilder(),
         },
       ),
+      // ---- Componentes por defecto (kit de core/widgets) ----
+      // Los botones nativos y ChromaButton comparten escala y forma: altura y
+      // radio de toque se definen una sola vez. El glow se dibuja solo en los
+      // widgets del kit (BoxShadow de color no entra en un ButtonStyle).
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 54),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: const TextStyle(
+            fontFamily: AppPalette.fontUi,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+          elevation: 0,
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 54),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          side: const BorderSide(color: AppPalette.lineStrong),
+          textStyle: const TextStyle(
+            fontFamily: AppPalette.fontUi,
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 0.2,
+          ),
+          elevation: 0,
+        ),
+      ),
+      cardTheme: const CardThemeData(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        color: AppPalette.surface,
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.all(Radius.circular(18)),
+        ),
+      ),
       appBarTheme: const AppBarTheme(
         centerTitle: true,
         elevation: 0,
@@ -98,14 +144,14 @@ abstract final class AppTheme {
 
   /// Estilo display (Unbounded). Peso fijo 600 vía eje wght.
   static TextStyle _display(double size) => TextStyle(
-        fontFamily: AppPalette.fontDisplay,
-        fontSize: size,
-        height: 1.08,
-        letterSpacing: -0.4,
-        fontWeight: FontWeight.w600,
-        color: AppPalette.textHigh,
-        fontVariations: const <FontVariation>[FontVariation('wght', 600)],
-      );
+    fontFamily: AppPalette.fontDisplay,
+    fontSize: size,
+    height: 1.08,
+    letterSpacing: -0.4,
+    fontWeight: FontWeight.w600,
+    color: AppPalette.textHigh,
+    fontVariations: const <FontVariation>[FontVariation('wght', 600)],
+  );
 
   /// Estilo de UI/cuerpo (Manrope). El peso se pide por eje `wght`.
   static TextStyle _ui(
@@ -126,11 +172,11 @@ abstract final class AppTheme {
   }
 
   static FontWeight _weightFrom(double wght) => switch (wght.toInt()) {
-        700 => FontWeight.w700,
-        600 => FontWeight.w600,
-        500 => FontWeight.w500,
-        _ => FontWeight.w400,
-      };
+    700 => FontWeight.w700,
+    600 => FontWeight.w600,
+    500 => FontWeight.w500,
+    _ => FontWeight.w400,
+  };
 }
 
 /// Transición por defecto de las rutas: fade + micro-slide vertical.

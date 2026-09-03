@@ -5,6 +5,7 @@ import '../../core/accessibility/accessibility_controller.dart';
 import '../../core/accessibility/color_vision_mode.dart';
 import '../../core/audio/audio_preferences.dart';
 import '../../core/layout/responsive.dart';
+import '../../core/widgets/ambient_backdrop.dart';
 import '../../shared/domain/entities/color_block.dart';
 import '../../shared/presentation/widgets/color_block_widget.dart';
 
@@ -21,83 +22,85 @@ class SettingsPage extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Ajustes')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.all(24),
-          children: <Widget>[
-            AppLayout.panel(
-              context,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: <Widget>[
-                  // ---- Sonido ----
-                  Text(
-                    'Sonido',
-                    style: textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Tonos por color en los destellos y efectos de la partida.',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Card(
-                    elevation: 0,
-                    margin: EdgeInsets.zero,
-                    color: scheme.surfaceContainerLow,
-                    clipBehavior: Clip.antiAlias,
-                    child: SwitchListTile(
-                      secondary: Icon(
-                        soundOn ? Icons.volume_up : Icons.volume_off,
-                        color: soundOn ? scheme.primary : scheme.outline,
+      body: AmbientBackdrop(
+        child: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: <Widget>[
+              AppLayout.panel(
+                context,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    // ---- Sonido ----
+                    Text(
+                      'Sonido',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                      title: const Text('Sonido'),
-                      value: soundOn,
-                      onChanged: (bool value) => ref
-                          .read(soundEnabledProvider.notifier)
-                          .setEnabled(value),
-                    ),
-                  ),
-                  const SizedBox(height: 28),
-
-                  // ---- Accesibilidad ----
-                  Text(
-                    'Modo daltónico',
-                    style: textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'Si tenés dificultad para distinguir colores (protanopía, '
-                    'deuteranopía o tritanopía), activá una opción y cada ficha '
-                    'mostrará una textura propia que no depende del color.',
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  _PreviewPanel(mode: mode),
-                  const SizedBox(height: 24),
-                  for (final ColorVisionMode option
-                      in ColorVisionMode.values) ...[
-                    _VisionTile(
-                      mode: option,
-                      selected: mode == option,
-                      onTap: () => ref
-                          .read(accessibilityProvider.notifier)
-                          .setMode(option),
                     ),
                     const SizedBox(height: 4),
+                    Text(
+                      'Tonos por color en los destellos y efectos de la partida.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Card(
+                      elevation: 0,
+                      margin: EdgeInsets.zero,
+                      color: scheme.surfaceContainerLow,
+                      clipBehavior: Clip.antiAlias,
+                      child: SwitchListTile(
+                        secondary: Icon(
+                          soundOn ? Icons.volume_up : Icons.volume_off,
+                          color: soundOn ? scheme.primary : scheme.outline,
+                        ),
+                        title: const Text('Sonido'),
+                        value: soundOn,
+                        onChanged: (bool value) => ref
+                            .read(soundEnabledProvider.notifier)
+                            .setEnabled(value),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ---- Accesibilidad ----
+                    Text(
+                      'Modo daltónico',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Si tenés dificultad para distinguir colores (protanopía, '
+                      'deuteranopía o tritanopía), activá una opción y cada ficha '
+                      'mostrará una textura propia que no depende del color.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _PreviewPanel(mode: mode),
+                    const SizedBox(height: 24),
+                    for (final ColorVisionMode option
+                        in ColorVisionMode.values) ...[
+                      _VisionTile(
+                        mode: option,
+                        selected: mode == option,
+                        onTap: () => ref
+                            .read(accessibilityProvider.notifier)
+                            .setMode(option),
+                      ),
+                      const SizedBox(height: 4),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -130,11 +133,7 @@ class _PreviewPanel extends StatelessWidget {
                 Expanded(
                   child: AspectRatio(
                     aspectRatio: 1,
-                    child: ColorBlockWidget(
-                      id: id,
-                      onTap: null,
-                      vision: mode,
-                    ),
+                    child: ColorBlockWidget(id: id, onTap: null, vision: mode),
                   ),
                 ),
                 if (id != ColorId.values.last) const SizedBox(width: 10),
@@ -145,9 +144,11 @@ class _PreviewPanel extends StatelessWidget {
           Text(
             mode.usesPatterns
                 ? 'Así se verán tus fichas: cada una tiene su patrón '
-                    '(${mode.label.toLowerCase()}).'
+                      '(${mode.label.toLowerCase()}).'
                 : 'Elegí tu condición arriba para activar las texturas.',
-            style: textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            style: textTheme.bodySmall?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -175,9 +176,7 @@ class _VisionTile extends StatelessWidget {
       margin: EdgeInsets.zero,
       elevation: 0,
       color: selected ? scheme.secondaryContainer : scheme.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       clipBehavior: Clip.antiAlias,
       child: ListTile(
         onTap: onTap,

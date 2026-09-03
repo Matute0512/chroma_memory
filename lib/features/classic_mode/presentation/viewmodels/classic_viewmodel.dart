@@ -72,16 +72,16 @@ class ClassicState {
   });
 
   factory ClassicState.initial({int bestScore = 0}) => ClassicState(
-        phase: ClassicPhase.ready,
-        sequence: const ClassicSequence(<ColorId>[]),
-        userProgress: 0,
-        round: 1,
-        score: 0,
-        bestScore: bestScore,
-        isNewBest: false,
-        completed: false,
-        mistakes: 0,
-      );
+    phase: ClassicPhase.ready,
+    sequence: const ClassicSequence(<ColorId>[]),
+    userProgress: 0,
+    round: 1,
+    score: 0,
+    bestScore: bestScore,
+    isNewBest: false,
+    completed: false,
+    mistakes: 0,
+  );
 
   final ClassicPhase phase;
 
@@ -152,10 +152,10 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
     required GenerateSequenceUseCase generateSequence,
     required ValidateUserInputUseCase validateInput,
     this.rules = const SequenceRules(),
-  })  : _repository = repository,
-        _generateSequence = generateSequence,
-        _validateInput = validateInput,
-        super(ClassicState.initial());
+  }) : _repository = repository,
+       _generateSequence = generateSequence,
+       _validateInput = validateInput,
+       super(ClassicState.initial());
 
   final IClassicRepository _repository;
   final GenerateSequenceUseCase _generateSequence;
@@ -166,6 +166,11 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
   int _token = 0;
 
   bool _busy = false;
+
+  /// true si el jugador pausó durante su turno (`ClassicPhase.input`).
+  bool _paused = false;
+
+  bool get paused => _paused;
 
   /// Si esta partida superó el mejor puntaje (para mostrarlo al final).
   bool _earnedNewBest = false;
@@ -181,8 +186,9 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
   static const Duration _roundPause = Duration(milliseconds: 900);
 
   /// Largo de la secuencia según las reglas del modo.
-  int get _sequenceLength =>
-      rules.growRounds ? rules.startLength + state.round - 1 : rules.startLength;
+  int get _sequenceLength => rules.growRounds
+      ? rules.startLength + state.round - 1
+      : rules.startLength;
 
   math.Random get _random => _rng ?? math.Random();
 
@@ -207,6 +213,7 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
   Future<void> newGame() async {
     _token++;
     _busy = false;
+    _paused = false;
     _earnedNewBest = false;
     // Diario: misma semilla todo el día; Clásico/Zen: azar por partida.
     _rng = rules.fixedSeed != null ? math.Random(rules.fixedSeed) : null;
@@ -219,19 +226,33 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
     await _playRound(token);
   }
 
+  /// Pausa la partida.
+  ///
+  /// Solo tiene sentido durante el turno del jugador (`ClassicPhase.input`):
+  /// en medio de la revelación (_watching_) no se puede congelar el reloj de
+  /// la secuencia, así que se ignora.
+  void pause() {
+    if (state.phase == ClassicPhase.input) _paused = true;
+  }
+
+  /// Reanuda un turno pausado.
+  void resume() {
+    _paused = false;
+  }
+
   /// El jugador tocó una ficha. Devuelve cómo seguir para dar feedback.
   Future<TapOutcome> onTile(ColorId tapped) async {
-    if (_busy || !state.isInputEnabled) return TapOutcome.none;
+    if (_paused || _busy || !state.isInputEnabled) return TapOutcome.none;
     final int token = _token;
 
     final ClassicSequence sequence = state.sequence;
     final bool isCorrect =
         _validateInput(
-              sequence: sequence.colors,
-              index: state.userProgress,
-              tapped: tapped,
-            ) ==
-            UserInputValidation.correct;
+          sequence: sequence.colors,
+          index: state.userProgress,
+          tapped: tapped,
+        ) ==
+        UserInputValidation.correct;
 
     if (!isCorrect) {
       // Modos con penalización: termina. Zen: suma error y reintenta.
@@ -239,10 +260,7 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
         _token++;
         final int newMistakes = state.mistakes + 1;
         final int retryToken = _token;
-        state = state.copyWith(
-          mistakes: newMistakes,
-          userProgress: 0,
-        );
+        state = state.copyWith(mistakes: newMistakes, userProgress: 0);
         if (rules.reviewOnMistake) {
           await _playRound(retryToken, reuse: sequence);
         }
@@ -298,6 +316,7 @@ class ClassicViewModel extends StateNotifier<ClassicState> {
   void resetToReady() {
     _token++;
     _busy = false;
+    _paused = false;
     state = ClassicState.initial(bestScore: state.bestScore);
   }
 
